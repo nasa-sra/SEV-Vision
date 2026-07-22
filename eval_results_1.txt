@@ -1,0 +1,27 @@
+# Results from first evaluation (unmodified nvidia/segformer-b3-finetuned-cityscapes-1024-1024):
+Images dir: kitti_eval/images
+GT dir: kitti_eval/masks_cityscapes
+Sampling stride: every 10th image
+Sampled images: 84
+Evaluated pairs: 84
+Skipped (missing GT): 0
+Valid pixels: 39122803
+Ignore index: 255
+
+Aggregate metrics
+Pixel Accuracy: 0.6643
+Mean Accuracy:  0.3355
+mIoU:           0.2556
+FWIoU:          0.5290
+
+Per-class IoU (classes present in GT)
+ 0 road            IoU=0.4433 support=7682762
+ 2 building        IoU=0.0759 support=222886
+ 4 fence           IoU=0.0065 support=1192170
+ 5 pole            IoU=0.2600 support=126928
+ 7 traffic sign    IoU=0.6641 support=253390
+ 8 vegetation      IoU=0.8910 support=7822488
+ 9 terrain         IoU=0.0094 support=10466317
+10 sky             IoU=0.9250 support=7589761
+13 car             IoU=0.8522 support=3148365
+14 truck           IoU=0.4728 support=617736

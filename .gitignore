@@ -1,0 +1,7 @@
+kitti_eval/images
+kitti_eval/masks_kitti
+kitti_eval/masks_cityscapes
+
+*.png
+*:Zone.Identifier
+*.jpg
