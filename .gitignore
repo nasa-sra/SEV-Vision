@@ -5,3 +5,8 @@ kitti_eval/masks_cityscapes
 *.png
 *:Zone.Identifier
 *.jpg
+*.npy
+*.raw
+
+segformer_depth_finetuned
+segformer_depth_finetuned_*
