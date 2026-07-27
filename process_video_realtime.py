@@ -56,6 +56,8 @@ cfg = rs.config()
 cfg.enable_device_from_file("video/Building9ToRockyard.db3", repeat_playback=False)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+use_fp16 = device == "cuda"
+inference_dtype = torch.float16 if use_fp16 else torch.float32
 model_path = Path("segformer_depth_finetuned_17")
 if not model_path.exists():
     raise FileNotFoundError(f"Model folder not found: {model_path}")
@@ -63,6 +65,16 @@ if not model_path.exists():
 processor = SegformerImageProcessor.from_pretrained(model_path)
 model = SegformerForSemanticSegmentation.from_pretrained(model_path).to(device)
 expand_segformer_to_4_channels(model)
+if use_fp16:
+    model = model.half()
+
+if hasattr(torch, "compile"):
+    try:
+        model = torch.compile(model, mode="reduce-overhead")
+        print("Enabled torch.compile with mode='reduce-overhead'.")
+    except Exception as compile_err:
+        print(f"torch.compile unavailable, continuing without it: {compile_err}")
+
 model.eval()
 
 id2label = {int(class_id): str(name) for class_id, name in model.config.id2label.items()}
@@ -125,8 +137,17 @@ try:
         depth_raw_display = depth_raw
 
         pil_image = Image.fromarray(color_rgb)
-        inputs = processor(images=pil_image, return_tensors="pt").to(device)
-        pixel_values = inputs["pixel_values"]
+        inputs = processor(images=pil_image, return_tensors="pt")
+        pixel_values_cpu = inputs["pixel_values"]
+        if device == "cuda":
+            pixel_values = pixel_values_cpu.pin_memory().to(
+                device=device,
+                dtype=inference_dtype,
+                non_blocking=True,
+            )
+        else:
+            pixel_values = pixel_values_cpu.to(device=device, dtype=inference_dtype)
+
         input_h, input_w = pixel_values.shape[2], pixel_values.shape[3]
 
         depth_raw_model = depth_raw
@@ -138,12 +159,21 @@ try:
             depth_scale_m=depth_scale_m,
             max_depth_m=max_depth_m,
         )
-        depth_tensor = torch.from_numpy(depth).to(device=device, dtype=pixel_values.dtype)
-        depth_tensor = depth_tensor.unsqueeze(0).unsqueeze(0)
-        inputs["pixel_values"] = torch.cat([pixel_values, depth_tensor], dim=1)
+        depth_tensor_cpu = torch.from_numpy(depth).unsqueeze(0).unsqueeze(0)
+        if device == "cuda":
+            depth_tensor = depth_tensor_cpu.pin_memory().to(
+                device=device,
+                dtype=inference_dtype,
+                non_blocking=True,
+            )
+        else:
+            depth_tensor = depth_tensor_cpu.to(device=device, dtype=inference_dtype)
+
+        inputs = {"pixel_values": torch.cat([pixel_values, depth_tensor], dim=1)}
 
         with torch.inference_mode():
-            outputs = model(**inputs)
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_fp16):
+                outputs = model(**inputs)
 
         smoothed_logits = None
 
