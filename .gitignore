@@ -10,3 +10,5 @@ kitti_eval/masks_cityscapes
 
 segformer_depth_finetuned
 segformer_depth_finetuned_*
+
+*.db3

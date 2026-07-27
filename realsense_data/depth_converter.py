@@ -18,12 +18,17 @@ def convert_depth_to_model_range(
 	- 0.0 -> 0 meters
 	- 1.0 -> max_depth_m (and invalid pixels)
 	"""
+	if depth_scale_m_per_unit <= 0.0:
+		raise ValueError(f"depth_scale_m_per_unit must be > 0, got {depth_scale_m_per_unit}")
+	if max_depth_m <= 0.0:
+		raise ValueError(f"max_depth_m must be > 0, got {max_depth_m}")
+
 	depth_m = depth_raw.astype(np.float32) * depth_scale_m_per_unit
+	invalid_mask = depth_m <= 0.0
 	depth_m = np.clip(depth_m, 0.0, max_depth_m)
 	depth_norm = depth_m / max_depth_m
 
-	# RealSense uses 0 for invalid depth in z16 streams.
-	invalid_mask = depth_raw == 0
+	# Invalid depth is encoded as far depth (1.0) for this project.
 	depth_norm[invalid_mask] = 1.0
 
 	return depth_norm

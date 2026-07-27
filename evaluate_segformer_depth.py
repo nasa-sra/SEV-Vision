@@ -23,6 +23,27 @@ def compute_fwiou_from_cm(cm: np.ndarray) -> float:
 	return float(np.nansum(freq * iou))
 
 
+def encode_depth01_to_model_range(depth01: np.ndarray) -> np.ndarray:
+	"""Convert normalized depth in [0, 1] to model range [-1, 1], with invalid mapped to +1."""
+	invalid_mask = depth01 <= 0.0
+	depth01 = np.clip(depth01.astype(np.float32), 0.0, 1.0)
+	depth01[invalid_mask] = 1.0
+	return depth01 * 2.0 - 1.0
+
+
+def encode_depth_raw_to_model_range(
+	depth_raw: np.ndarray,
+	depth_scale_m: float,
+	max_depth_m: float = 80.0,
+) -> np.ndarray:
+	"""Convert raw depth units to model range [-1, 1], with invalid mapped to +1."""
+	depth_m = depth_raw.astype(np.float32) * depth_scale_m
+	invalid_mask = depth_m <= 0.0
+	depth01 = np.clip(depth_m, 0.0, max_depth_m) / max_depth_m
+	depth01[invalid_mask] = 1.0
+	return depth01 * 2.0 - 1.0
+
+
 def expand_segformer_to_4_channels(model: SegformerForSemanticSegmentation) -> None:
 	"""Expand the first SegFormer patch embedding from 3->4 input channels.
 
@@ -71,6 +92,8 @@ def main() -> None:
 	run_preview_only = True
 	sampling_stride = 10
 	ignore_index = 255
+	depth_scale_m = 0.001  # RealSense raw depth units are typically millimeters.
+	max_depth_m = 80.0
 
 	image_paths = sorted(images_dir.glob("rgb_*.jpg"))
 	if not image_paths:
@@ -118,8 +141,7 @@ def main() -> None:
 					depth = depth[..., 0]
 				if depth.shape != (input_h, input_w):
 					depth = cv2.resize(depth, (input_w, input_h), interpolation=cv2.INTER_NEAREST)
-				depth = np.clip(depth, 0.0, 1.0)
-				depth = depth * 2.0 - 1.0
+				depth = encode_depth01_to_model_range(depth)
 			else:
 				depth = cv2.imread(str(preview_depth_path), cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
 				if depth is None:
@@ -128,11 +150,11 @@ def main() -> None:
 					depth = depth[..., 0]
 				if depth.shape != (input_h, input_w):
 					depth = cv2.resize(depth, (input_w, input_h), interpolation=cv2.INTER_NEAREST)
-				depth = depth.astype(np.float32) / 100.0
-				depth = np.clip(depth, 0.0, 80.0)
-				depth = depth / 80.0
-				depth[depth == 0] = 1
-				depth = depth * 2.0 - 1.0
+				depth = encode_depth_raw_to_model_range(
+					depth_raw=depth,
+					depth_scale_m=depth_scale_m,
+					max_depth_m=max_depth_m,
+				)
 
 			depth_tensor = torch.from_numpy(depth).to(device=device, dtype=pixel_values.dtype)
 			depth_tensor = depth_tensor.unsqueeze(0).unsqueeze(0)
@@ -234,11 +256,11 @@ def main() -> None:
 		if depth.shape != (input_h, input_w):
 			depth = cv2.resize(depth, (input_w, input_h), interpolation=cv2.INTER_NEAREST)
 
-		depth = depth.astype(np.float32) / 100.0
-		depth = np.clip(depth, 0.0, 80.0)
-		depth = depth / 80.0
-		depth[depth == 0] = 1
-		depth = depth * 2.0 - 1.0
+		depth = encode_depth_raw_to_model_range(
+			depth_raw=depth,
+			depth_scale_m=depth_scale_m,
+			max_depth_m=max_depth_m,
+		)
 		depth_tensor = torch.from_numpy(depth).to(device=device, dtype=pixel_values.dtype)
 		depth_tensor = depth_tensor.unsqueeze(0).unsqueeze(0)
 		inputs["pixel_values"] = torch.cat([pixel_values, depth_tensor], dim=1)
