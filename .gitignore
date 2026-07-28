@@ -12,3 +12,5 @@ segformer_depth_finetuned
 segformer_depth_finetuned_*
 
 *.db3
+
+__pycache__/
