@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 import time
 from typing import Dict
@@ -149,8 +150,24 @@ class TrtSegformerRunner:
         return None
 
     def close(self) -> None:
-        self.input_tensor = None
-        self.output_tensor = None
+        try:
+            self.input_tensor = None
+            self.output_tensor = None
+            self.context = None
+            self.engine = None
+            self.logger = None
+            self.trt = None
+            self.stream = None
+            self.input_name = None
+            self.output_name = None
+            self.input_index = None
+            self.output_index = None
+            self.last_input_shape = None
+        finally:
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+            gc.collect()
 
     def _set_input_shape(self, input_shape) -> None:
         if self.last_input_shape == tuple(input_shape):

@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 from typing import Any, Dict
 
@@ -92,4 +93,13 @@ class TorchSegformerBackend:
         return outputs.logits
 
     def close(self) -> None:
-        return
+        try:
+            self.model = None
+            self.processor = None
+            self.id2label = {}
+            self.num_classes = 0
+        finally:
+            if self.device == "cuda" and torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+            gc.collect()

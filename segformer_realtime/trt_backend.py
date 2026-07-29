@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 import time
 from typing import Dict
@@ -158,4 +159,30 @@ class TrtSegformerBackend:
         return self.runner.infer(prepared)
 
     def close(self) -> None:
-        self.runner.close()
+        try:
+            if self.runner is not None:
+                self.runner.close()
+        finally:
+            self.runner = None
+            self._resized_rgb_u8 = None
+            self._rgb_float_hwc = None
+            self._depth_raw_resized = None
+            self._depth_invalid_mask = None
+            self._packed_input = None
+            self._preprocess_timing = {
+                "rgb_resize": 0.0,
+                "rgb_to_float": 0.0,
+                "rgb_normalize": 0.0,
+                "rgb_layout": 0.0,
+                "depth_resize": 0.0,
+                "depth_encode": 0.0,
+                "pack_input": 0.0,
+                "total": 0.0,
+                "count": 0.0,
+            }
+            self.id2label = {}
+            self.num_classes = 0
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+            gc.collect()
