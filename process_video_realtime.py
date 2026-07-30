@@ -11,7 +11,7 @@ from segformer_realtime import TorchSegformerBackend, TrtSegformerBackend
 # Depth range used for label validity (adjust in code as needed).
 DEPTH_LABEL_MIN_M = 3.0
 DEPTH_LABEL_MAX_M = 80.0
-ROAD_OVERRIDE_CONFIDENCE = 0.001
+ROAD_OVERRIDE_CONFIDENCE = 0.01
 
 
 def parse_args() -> argparse.Namespace:
@@ -265,6 +265,7 @@ def main() -> None:
                 previous_logits = smoothed_logits
 
                 prediction_tensor = smoothed_logits.argmax(dim=1)
+
                 
                 if road_class_ids:
                     probabilities = torch.softmax(smoothed_logits, dim=1)
@@ -278,6 +279,7 @@ def main() -> None:
                     road_choice_global = road_class_tensor[road_choice_local]
                     road_override_mask = road_confidence > ROAD_OVERRIDE_CONFIDENCE
                     prediction_tensor = torch.where(road_override_mask, road_choice_global, prediction_tensor)
+                
                 
 
                 prediction = prediction_tensor[0].detach().cpu().numpy().astype(np.int16)
